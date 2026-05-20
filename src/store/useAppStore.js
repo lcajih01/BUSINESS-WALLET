@@ -211,17 +211,46 @@ export const useAppStore = create(
         db.upsertBill(newBill).catch(console.error);
       },
 
-      payBill: (id, amount) => {
-        set(state => ({
-          bills: state.bills.map(b => {
+      // walletId: wallet the payment comes from (required to deduct balance + create ledger entry)
+      payBill: (id, amount, walletId) => {
+        const bill = get().bills.find(b => b.id === id);
+        if (!bill) return;
+        const remaining = bill.amount - (bill.paidAmount || 0);
+        const payAmt    = Math.min(amount ?? remaining, remaining); // never overpay
+        if (payAmt <= 0) return;
+
+        // Expense transaction so the Logbook records the payment
+        const expTx = walletId ? {
+          id:        crypto.randomUUID(),
+          type:      'EXPENSE',
+          business:  bill.business,
+          wallet:    walletId,
+          category:  bill.category || null,
+          amount:    payAmt,
+          note:      `Bill payment: ${bill.name}`,
+          room:      '',
+          createdAt: new Date().toISOString(),
+        } : null;
+
+        set(state => {
+          const newPaid = (bill.paidAmount || 0) + payAmt;
+          const updatedBills = state.bills.map(b => {
             if (b.id !== id) return b;
-            const payAmt  = amount ?? b.amount;
-            const newPaid = Math.min(b.amount, (b.paidAmount || 0) + payAmt);
             return { ...b, paidAmount: newPaid, paidAt: newPaid >= b.amount ? new Date().toISOString() : (b.paidAt || null) };
-          }),
-        }));
-        const updated = get().bills.find(b => b.id === id);
-        if (updated) db.upsertBill(updated).catch(console.error);
+          });
+          const balances = { ...state.walletBalances };
+          if (walletId) balances[walletId] = (balances[walletId] || 0) - payAmt;
+          return {
+            bills:        updatedBills,
+            transactions: expTx ? [expTx, ...state.transactions] : state.transactions,
+            walletBalances: balances,
+          };
+        });
+
+        const updatedBill = get().bills.find(b => b.id === id);
+        if (updatedBill) db.upsertBill(updatedBill).catch(console.error);
+        if (expTx)        db.upsertTransaction(expTx).catch(console.error);
+        if (walletId)     db.upsertBalances(get().walletBalances).catch(console.error);
       },
 
       markBillUnpaid: (id) => {

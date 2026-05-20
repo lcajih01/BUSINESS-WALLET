@@ -4,7 +4,7 @@ import { AlertTriangle, Clock, CheckCircle2, Pencil, Trash2, X } from 'lucide-re
 import ConfirmSheet from '../components/ui/ConfirmSheet';
 import PageHeader from '../components/layout/PageHeader';
 import { formatPeso } from '../lib/format';
-import { BUSINESSES, BILL_PRIORITIES, CATEGORIES } from '../lib/constants';
+import { BUSINESSES, BILL_PRIORITIES, CATEGORIES, WALLETS } from '../lib/constants';
 import { useAppStore } from '../store/useAppStore';
 import { getBillStatus, getBillRemaining, getDaysLeft } from '../lib/engines/decisionEngine';
 
@@ -26,7 +26,7 @@ const inputSt = {
   fontSize: 14, width: '100%', outline: 'none',
 };
 
-function BillCard({ bill, onPay, onUnpay, onEdit, onDelete }) {
+function BillCard({ bill, onPay, onUnpay, onPartialPay, onEdit, onDelete }) {
   const status    = getBillStatus(bill);
   const daysLeft  = getDaysLeft(bill.dueDate);
   const remaining = getBillRemaining(bill);
@@ -93,19 +93,35 @@ function BillCard({ bill, onPay, onUnpay, onEdit, onDelete }) {
           >
             {formatPeso(remaining > 0 ? remaining : bill.amount)}
           </span>
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onClick={() => isPaid ? onUnpay(bill.id) : onPay(bill.id)}
-            className="tap px-3 py-1.5 rounded-xl text-xs font-bold"
-            style={isPaid ? {
-              background: 'var(--color-cream)', color: 'var(--color-ink-tertiary)',
-              border: '1px solid var(--color-ink-faint)',
-            } : {
-              background: 'var(--color-forest)', color: 'white',
-            }}
-          >
-            {isPaid ? 'Void' : 'Mark Paid'}
-          </motion.button>
+          {isPaid ? (
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => onUnpay(bill.id)}
+              className="tap px-3 py-1.5 rounded-xl text-xs font-bold"
+              style={{ background: 'var(--color-cream)', color: 'var(--color-ink-tertiary)', border: '1px solid var(--color-ink-faint)' }}
+            >
+              Void
+            </motion.button>
+          ) : (
+            <div className="flex flex-col gap-1.5 items-end">
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                onClick={() => onPay(bill)}
+                className="tap px-3 py-1.5 rounded-xl text-xs font-bold text-white"
+                style={{ background: 'var(--color-forest)' }}
+              >
+                Mark Paid
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                onClick={() => onPartialPay(bill)}
+                className="tap px-3 py-1.5 rounded-xl text-xs font-bold"
+                style={{ background: 'var(--color-forest-pale)', color: 'var(--color-forest)' }}
+              >
+                Partial Pay
+              </motion.button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -134,11 +150,17 @@ function BillCard({ bill, onPay, onUnpay, onEdit, onDelete }) {
 
 const BILL_EMPTY = { name: '', amount: '', business: 'HSH', priority: 'IMPORTANT', dueDate: '', category: '' };
 
+// Default cash-on-hand wallet per business for quick full payment
+const DEFAULT_COH = { HSH: 'HSH_COH', TRZ: 'TRZ_COH', PERSONAL: 'PERS_CASH' };
+
 export default function Bills() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [editBill,     setEditBill]     = useState(null);
   const [editForm,     setEditForm]     = useState(BILL_EMPTY);
   const [confirm,      setConfirm]      = useState(null);
+  const [paySheet,     setPaySheet]     = useState(null); // bill currently being paid
+  const [payAmount,    setPayAmount]    = useState('');
+  const [payWallet,    setPayWallet]    = useState('');
 
   const { bills, payBill, markBillUnpaid, editBill: storEditBill, deleteBill } = useAppStore();
 
@@ -193,7 +215,38 @@ export default function Bills() {
     setEditBill(null);
   };
 
-  const businesses = Object.values(BUSINESSES);
+  // Mark Paid: full remaining amount, default COH wallet, no sheet needed
+  const handleMarkPaid = (bill) => {
+    const walletId = DEFAULT_COH[bill.business] || 'HSH_COH';
+    payBill(bill.id, bill.amount - (bill.paidAmount || 0), walletId);
+  };
+
+  // Partial Pay: open sheet pre-filled with remaining amount and default wallet
+  const openPaySheet = (bill) => {
+    setPaySheet(bill);
+    setPayAmount(String(bill.amount - (bill.paidAmount || 0)));
+    setPayWallet(DEFAULT_COH[bill.business] || 'HSH_COH');
+  };
+
+  const submitPaySheet = () => {
+    if (!paySheet) return;
+    const amt       = parseFloat(payAmount);
+    const remaining = paySheet.amount - (paySheet.paidAmount || 0);
+    if (!amt || amt <= 0 || !payWallet) return;
+    payBill(paySheet.id, Math.min(amt, remaining), payWallet); // store also guards, belt-and-suspenders
+    setPaySheet(null);
+  };
+
+  const businesses    = Object.values(BUSINESSES);
+
+  // Pay-sheet derived values (needed in JSX)
+  const payRemaining   = paySheet ? paySheet.amount - (paySheet.paidAmount || 0) : 0;
+  const payAmtNum      = parseFloat(payAmount) || 0;
+  const payIsOver      = payAmtNum > payRemaining;
+  const canPay         = payAmtNum > 0 && !payIsOver && !!payWallet;
+  const payableWallets = paySheet
+    ? WALLETS.filter(w => w.business === paySheet.business && !w.isReceivable)
+    : [];
 
   return (
     <div style={{ background: 'var(--color-cream)' }}>
@@ -271,8 +324,9 @@ export default function Bills() {
           >
             <BillCard
               bill={bill}
-              onPay={id => payBill(id, bill.amount - (bill.paidAmount || 0))}
+              onPay={handleMarkPaid}
               onUnpay={markBillUnpaid}
+              onPartialPay={openPaySheet}
               onEdit={openEdit}
               onDelete={handleDelete}
             />
@@ -287,6 +341,97 @@ export default function Bills() {
         onConfirm={() => { confirm.onConfirm(); setConfirm(null); }}
         onCancel={() => setConfirm(null)}
       />
+
+      {/* ── Pay Bill Sheet ── */}
+      <AnimatePresence>
+        {paySheet && (
+          <>
+            <motion.div
+              key="pay-overlay"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="fixed inset-0 z-40"
+              style={{ background: 'rgba(0,0,0,0.4)' }}
+              onClick={() => setPaySheet(null)}
+            />
+            <motion.div
+              key="pay-sheet"
+              initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+              transition={{ type: 'spring', stiffness: 400, damping: 40 }}
+              className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl"
+              style={{ background: 'var(--color-surface)', maxHeight: '80vh', overflowY: 'auto' }}
+            >
+              <div className="flex justify-center pt-3 pb-1">
+                <div className="w-10 h-1 rounded-full" style={{ background: 'var(--color-ink-faint)' }} />
+              </div>
+              <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid var(--color-ink-faint)' }}>
+                <div>
+                  <p className="font-bold text-base" style={{ color: 'var(--color-ink)' }}>Pay Bill</p>
+                  <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--color-ink-tertiary)', maxWidth: '60vw' }}>{paySheet.name}</p>
+                </div>
+                <motion.button whileTap={{ scale: 0.88 }} onClick={() => setPaySheet(null)} className="tap w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'var(--color-ink-faint)' }}>
+                  <X size={15} strokeWidth={2} />
+                </motion.button>
+              </div>
+
+              <div className="px-5 py-4 space-y-3">
+                {/* Remaining balance context */}
+                <div className="flex items-center justify-between p-3 rounded-2xl" style={{ background: 'var(--color-cream)' }}>
+                  <span className="text-sm font-medium" style={{ color: 'var(--color-ink-tertiary)' }}>Remaining Balance</span>
+                  <span className="font-bold tabular" style={{ color: 'var(--color-ruby-light)' }}>{formatPeso(payRemaining)}</span>
+                </div>
+
+                {/* Amount */}
+                <div>
+                  <label style={labelCls}>Amount to Pay (₱)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max={payRemaining}
+                    style={inputSt}
+                    value={payAmount}
+                    onChange={e => setPayAmount(e.target.value)}
+                    autoFocus
+                  />
+                  {payIsOver && (
+                    <p className="text-xs mt-1" style={{ color: 'var(--color-ruby-light)' }}>
+                      Cannot exceed remaining balance of {formatPeso(payRemaining)}.
+                    </p>
+                  )}
+                </div>
+
+                {/* Wallet */}
+                <div>
+                  <label style={labelCls}>Pay From Wallet</label>
+                  <select
+                    style={inputSt}
+                    value={payWallet}
+                    onChange={e => setPayWallet(e.target.value)}
+                  >
+                    {payableWallets.map(w => (
+                      <option key={w.id} value={w.id}>{w.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <motion.button
+                  whileTap={{ scale: canPay ? 0.97 : 1 }}
+                  onClick={submitPaySheet}
+                  disabled={!canPay}
+                  className="tap w-full py-3 rounded-xl font-semibold text-sm"
+                  style={{
+                    background: canPay ? 'var(--color-forest)' : 'var(--color-ink-faint)',
+                    color:      canPay ? 'white' : 'var(--color-ink-quaternary)',
+                  }}
+                >
+                  {canPay ? `Pay ${formatPeso(Math.min(payAmtNum, payRemaining))}` : 'Enter valid amount'}
+                </motion.button>
+              </div>
+              <div style={{ height: 24 }} />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* ── Edit Bill Sheet ── */}
       <AnimatePresence>

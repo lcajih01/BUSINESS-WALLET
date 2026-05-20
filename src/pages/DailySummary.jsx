@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Calculator, TrendingUp, TrendingDown } from 'lucide-react';
+import { Calculator, TrendingUp, TrendingDown } from 'lucide-react';
 import PageHeader from '../components/layout/PageHeader';
 import { formatPeso } from '../lib/format';
 import { WALLETS } from '../lib/constants';
@@ -114,18 +114,6 @@ export default function DailySummary() {
     <div style={{ background: 'var(--color-cream)' }}>
       <PageHeader title="Daily Summary" subtitle={dateLabel} />
 
-      {/* Date navigator (placeholder — future: navigate days) */}
-      <div className="flex items-center justify-between px-5 mb-4">
-        <motion.button whileTap={{ scale: 0.88 }} className="tap w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.05)' }}>
-          <ChevronLeft size={18} strokeWidth={2} />
-        </motion.button>
-        <span className="font-semibold text-sm" style={{ color: 'var(--color-ink-secondary)' }}>
-          {dateLabel}
-        </span>
-        <motion.button whileTap={{ scale: 0.88 }} className="tap w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.05)' }}>
-          <ChevronRight size={18} strokeWidth={2} />
-        </motion.button>
-      </div>
 
       <div className="px-4 space-y-3">
         {/* Summary card */}

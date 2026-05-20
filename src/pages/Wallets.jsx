@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight, ArrowUpRight, ArrowDownLeft, Clock, Pencil, Check, X, Plus, Trash2 } from 'lucide-react';
+import ConfirmSheet from '../components/ui/ConfirmSheet';
 import PageHeader from '../components/layout/PageHeader';
 import { formatPeso, formatDate } from '../lib/format';
 import { WALLETS, BUSINESSES, WALLET_TYPE_ICONS } from '../lib/constants';
@@ -88,6 +89,7 @@ function WalletCard({ wallet, state, onExpand, isExpanded, onAdd, onTransfer }) 
   const [addForm,    setAddForm]    = useState(RECV_EMPTY);
   const [editRecvId, setEditRecvId] = useState(null);
   const [editForm,   setEditForm]   = useState(RECV_EMPTY);
+  const [confirm,    setConfirm]    = useState(null);
 
   const balance   = state.walletBalances[wallet.id] || 0;
   const reserved  = getReservedBalance(state, wallet.id);
@@ -142,12 +144,15 @@ function WalletCard({ wallet, state, onExpand, isExpanded, onAdd, onTransfer }) 
   };
 
   const handleDeleteRecv = (id) => {
-    if (window.confirm('Delete this receivable?')) {
-      state.deleteReceivable(id);
-    }
+    setConfirm({
+      message: 'Delete this receivable? This cannot be undone.',
+      confirmLabel: 'Delete',
+      onConfirm: () => state.deleteReceivable(id),
+    });
   };
 
   return (
+    <>
     <div className="overflow-hidden rounded-3xl" style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.10), 0 8px 28px rgba(0,0,0,0.08)' }}>
       <motion.button
         whileTap={{ scale: 0.98 }}
@@ -435,6 +440,13 @@ function WalletCard({ wallet, state, onExpand, isExpanded, onAdd, onTransfer }) 
         )}
       </AnimatePresence>
     </div>
+    <ConfirmSheet
+      message={confirm?.message}
+      confirmLabel={confirm?.confirmLabel}
+      onConfirm={() => { confirm.onConfirm(); setConfirm(null); }}
+      onCancel={() => setConfirm(null)}
+    />
+    </>
   );
 }
 

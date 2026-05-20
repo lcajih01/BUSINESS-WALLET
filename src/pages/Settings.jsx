@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Building2, Wallet, Tag, RefreshCcw, Database, ChevronRight, Info, RotateCcw, X, ClipboardList, Plus, ToggleLeft, ToggleRight } from 'lucide-react';
+import ConfirmSheet from '../components/ui/ConfirmSheet';
 import PageHeader from '../components/layout/PageHeader';
 import { BUSINESSES, WALLETS, CATEGORIES } from '../lib/constants';
 import { formatPeso } from '../lib/format';
@@ -519,11 +520,14 @@ export default function Settings() {
   const [walletModal,  setWalletModal]  = useState(null);
   const [catsOpen,     setCatsOpen]     = useState(false);
   const [billMgmtOpen, setBillMgmtOpen] = useState(false);
+  const [confirm,      setConfirm]      = useState(null);
 
   const handleReset = () => {
-    if (window.confirm('Reset all data to seed values? This cannot be undone.')) {
-      resetToSeed();
-    }
+    setConfirm({
+      message: 'Reset all data to seed values? This cannot be undone.',
+      confirmLabel: 'Reset',
+      onConfirm: () => resetToSeed(),
+    });
   };
 
   const handleExport = () => {
@@ -659,6 +663,13 @@ export default function Settings() {
 
         <div style={{ height: 8 }} />
       </div>
+
+      <ConfirmSheet
+        message={confirm?.message}
+        confirmLabel={confirm?.confirmLabel}
+        onConfirm={() => { confirm.onConfirm(); setConfirm(null); }}
+        onCancel={() => setConfirm(null)}
+      />
 
       {/* ── Business detail modal ── */}
       <BottomModal open={!!bizModal} onClose={() => setBizModal(null)} title="Business Details">

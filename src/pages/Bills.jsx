@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, Clock, CheckCircle2, Pencil, Trash2, X } from 'lucide-react';
+import ConfirmSheet from '../components/ui/ConfirmSheet';
 import PageHeader from '../components/layout/PageHeader';
 import { formatPeso } from '../lib/format';
 import { BUSINESSES, BILL_PRIORITIES, CATEGORIES } from '../lib/constants';
@@ -137,6 +138,7 @@ export default function Bills() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [editBill,     setEditBill]     = useState(null);
   const [editForm,     setEditForm]     = useState(BILL_EMPTY);
+  const [confirm,      setConfirm]      = useState(null);
 
   const { bills, payBill, markBillUnpaid, editBill: storEditBill, deleteBill } = useAppStore();
 
@@ -170,9 +172,11 @@ export default function Bills() {
   };
 
   const handleDelete = (id) => {
-    if (window.confirm('Delete this bill? This cannot be undone.')) {
-      deleteBill(id);
-    }
+    setConfirm({
+      message: 'Delete this bill? This cannot be undone.',
+      confirmLabel: 'Delete',
+      onConfirm: () => deleteBill(id),
+    });
   };
 
   const saveEdit = () => {
@@ -276,6 +280,13 @@ export default function Bills() {
         ))}
         <div style={{ height: 8 }} />
       </div>
+
+      <ConfirmSheet
+        message={confirm?.message}
+        confirmLabel={confirm?.confirmLabel}
+        onConfirm={() => { confirm.onConfirm(); setConfirm(null); }}
+        onCancel={() => setConfirm(null)}
+      />
 
       {/* ── Edit Bill Sheet ── */}
       <AnimatePresence>

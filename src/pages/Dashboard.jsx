@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Settings, ChevronRight, TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
+import { Settings, ChevronRight, TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
 import StatusBadge from '../components/ui/StatusBadge';
 import TransactionItem from '../components/ui/TransactionItem';
 import { formatPeso } from '../lib/format';
@@ -95,16 +95,25 @@ export default function Dashboard() {
   const navigate   = useNavigate();
   const [activeBiz, setActiveBiz] = useState('ALL');
 
-  const state      = useAppStore();
-  const decision   = computeDecision(state);
-  const { cashIn: todayCashIn, cashOut: todayCashOut } = getTodayCashFlow(state);
-  const realCash   = decision.realCash;
-  const hshTotal   = getBusinessTotal(state, 'HSH');
-  const trzTotal   = getBusinessTotal(state, 'TRZ');
-  const persTotal  = getBusinessTotal(state, 'PERSONAL');
-  const totalAll   = getTotalAll(state);
+  const state = useAppStore();
+  const safeState = {
+    ...state,
+    bills:          state.bills          || [],
+    transactions:   state.transactions   || [],
+    deposits:       state.deposits       || [],
+    receivables:    state.receivables    || [],
+    walletBalances: state.walletBalances || {},
+  };
 
-  const urgentBills = state.bills
+  const decision   = computeDecision(safeState);
+  const { cashIn: todayCashIn, cashOut: todayCashOut } = getTodayCashFlow(safeState);
+  const realCash   = decision.realCash;
+  const hshTotal   = getBusinessTotal(safeState, 'HSH');
+  const trzTotal   = getBusinessTotal(safeState, 'TRZ');
+  const persTotal  = getBusinessTotal(safeState, 'PERSONAL');
+  const totalAll   = getTotalAll(safeState);
+
+  const urgentBills = safeState.bills
     .filter(b => {
       const days = getDaysLeft(b.dueDate);
       const remaining = b.amount - (b.paidAmount || 0);
@@ -113,11 +122,11 @@ export default function Dashboard() {
     .filter(b => activeBiz === 'ALL' || b.business === activeBiz)
     .slice(0, 3);
 
-  const totalDue = state.bills
+  const totalDue = safeState.bills
     .filter(b => (b.amount - (b.paidAmount || 0)) > 0)
     .reduce((s, b) => s + (b.amount - (b.paidAmount || 0)), 0);
 
-  const recentTx = state.transactions
+  const recentTx = safeState.transactions
     .filter(t => activeBiz === 'ALL' || t.business === activeBiz)
     .slice(0, 5);
 
@@ -135,23 +144,14 @@ export default function Dashboard() {
             Dashboard
           </h1>
         </div>
-        <div className="flex items-center gap-2">
-          <motion.button
-            whileTap={{ scale: 0.88 }}
-            className="tap w-9 h-9 rounded-full flex items-center justify-center"
-            style={{ background: 'rgba(0,0,0,0.05)' }}
-          >
-            <Bell size={18} strokeWidth={1.8} />
-          </motion.button>
-          <motion.button
-            whileTap={{ scale: 0.88 }}
-            onClick={() => navigate('/settings')}
-            className="tap w-9 h-9 rounded-full flex items-center justify-center"
-            style={{ background: 'rgba(0,0,0,0.05)' }}
-          >
-            <Settings size={18} strokeWidth={1.8} />
-          </motion.button>
-        </div>
+        <motion.button
+          whileTap={{ scale: 0.88 }}
+          onClick={() => navigate('/settings')}
+          className="tap w-9 h-9 rounded-full flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.05)' }}
+        >
+          <Settings size={18} strokeWidth={1.8} />
+        </motion.button>
       </div>
 
       {/* Business filter */}
@@ -317,7 +317,7 @@ export default function Dashboard() {
               key={tx.id}
               style={i < recentTx.length - 1 ? { borderBottom: '1px solid var(--color-ink-faint)' } : {}}
             >
-              <TransactionItem tx={tx} showBusiness={activeBiz === 'ALL'} />
+                <TransactionItem tx={tx} showBusiness={activeBiz === 'ALL'} />
             </div>
           ))}
           <motion.button

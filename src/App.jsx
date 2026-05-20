@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
+import { useAppStore } from './store/useAppStore';
 import AppShell from './components/layout/AppShell';
 import Dashboard from './pages/Dashboard';
 import Wallets from './pages/Wallets';
@@ -13,6 +15,12 @@ import More from './pages/More';
 import Settings from './pages/Settings';
 
 export default function App() {
+  // Load Supabase data first, then auto-generate overdue recurring bills
+  useEffect(() => {
+    const { initFromSupabase, checkAndGenerateRecurringBills } = useAppStore.getState();
+    initFromSupabase().then(checkAndGenerateRecurringBills).catch(console.error);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <AppShell>
       <Routes>

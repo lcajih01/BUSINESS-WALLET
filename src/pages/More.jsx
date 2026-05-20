@@ -16,8 +16,16 @@ const MENU_ITEMS = [
 
 export default function More() {
   const navigate = useNavigate();
-  const state    = useAppStore();
-  const decision = computeDecision(state);
+  const state = useAppStore();
+  const safeState = {
+    ...state,
+    bills:          state.bills          || [],
+    transactions:   state.transactions   || [],
+    deposits:       state.deposits       || [],
+    receivables:    state.receivables    || [],
+    walletBalances: state.walletBalances || {},
+  };
+  const decision = computeDecision(safeState);
   const { realCash, status } = decision;
 
   return (

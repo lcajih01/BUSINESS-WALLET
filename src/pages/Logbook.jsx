@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X } from 'lucide-react';
+import ConfirmSheet from '../components/ui/ConfirmSheet';
 import PageHeader from '../components/layout/PageHeader';
 import TransactionItem from '../components/ui/TransactionItem';
 import { formatDate } from '../lib/format';
@@ -54,6 +55,7 @@ export default function Logbook() {
   const [showSearch, setShowSearch] = useState(false);
   const [editTx,     setEditTx]     = useState(null);
   const [editForm,   setEditForm]   = useState({});
+  const [confirm,    setConfirm]    = useState(null);
 
   const { transactions, editTransaction, deleteTransaction } = useAppStore();
 
@@ -78,9 +80,11 @@ export default function Logbook() {
   };
 
   const handleDelete = (id) => {
-    if (window.confirm('Delete this transaction? Wallet balance will be reversed.')) {
-      deleteTransaction(id);
-    }
+    setConfirm({
+      message: 'Delete this transaction? The wallet balance will be reversed.',
+      confirmLabel: 'Delete',
+      onConfirm: () => deleteTransaction(id),
+    });
   };
 
   const saveEdit = () => {
@@ -196,6 +200,13 @@ export default function Logbook() {
 
         <div style={{ height: 8 }} />
       </div>
+
+      <ConfirmSheet
+        message={confirm?.message}
+        confirmLabel={confirm?.confirmLabel}
+        onConfirm={() => { confirm.onConfirm(); setConfirm(null); }}
+        onCancel={() => setConfirm(null)}
+      />
 
       {/* ── Edit Transaction Sheet ── */}
       <AnimatePresence>

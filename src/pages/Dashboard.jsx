@@ -126,6 +126,11 @@ export default function Dashboard() {
     .filter(b => (b.amount - (b.paidAmount || 0)) > 0)
     .reduce((s, b) => s + (b.amount - (b.paidAmount || 0)), 0);
 
+  // All pending receivables (incoming money owed to the business, not yet received)
+  const pendingRecvTotal = safeState.receivables
+    .filter(r => r.status === 'PENDING' && (activeBiz === 'ALL' || r.business === activeBiz))
+    .reduce((s, r) => s + r.amount, 0);
+
   const recentTx = safeState.transactions
     .filter(t => activeBiz === 'ALL' || t.business === activeBiz)
     .slice(0, 5);
@@ -292,6 +297,14 @@ export default function Dashboard() {
               {formatPeso(totalDue)}
             </span>
           </div>
+          {pendingRecvTotal > 0 && (
+            <div className="mt-2 flex items-center justify-between">
+              <span className="text-sm" style={{ color: 'var(--color-ink-tertiary)' }}>Expected Incoming</span>
+              <span className="font-bold text-base tabular text-in">
+                +{formatPeso(pendingRecvTotal)}
+              </span>
+            </div>
+          )}
         </motion.div>
 
         {/* Recent transactions */}

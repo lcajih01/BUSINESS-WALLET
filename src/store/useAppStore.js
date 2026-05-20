@@ -47,7 +47,7 @@ const SEED_BILLS = [
   { id: 'b1',  name: 'Electricity Bill',       business: 'HSH', amount: 12300, dueDate: dateFromNow(3),  priority: 'CRITICAL',  paidAmount: 0, isRecurring: true,  recurringDay: 20 },
   { id: 'b2',  name: 'Payroll (1st Half)',      business: 'HSH', amount: 85000, dueDate: dateFromNow(3),  priority: 'CRITICAL',  paidAmount: 0, isRecurring: true,  recurringDay: 15 },
   { id: 'b3',  name: 'Internet (PLDT)',         business: 'HSH', amount: 2200,  dueDate: dateFromNow(6),  priority: 'IMPORTANT', paidAmount: 0, isRecurring: true,  recurringDay: 18 },
-  { id: 'b4',  name: 'Booking.com Remittance', business: 'HSH', amount: 45000, dueDate: dateFromNow(8),  priority: 'CRITICAL',  paidAmount: 0, isRecurring: false },
+  // b4 removed — Booking.com Remittance is a RECEIVABLE, not a bill/payable
   { id: 'b5',  name: 'Water Bill',             business: 'TRZ', amount: 3800,  dueDate: dateFromNow(10), priority: 'IMPORTANT', paidAmount: 0, isRecurring: true,  recurringDay: 22 },
   { id: 'b6',  name: 'Electricity Bill',       business: 'TRZ', amount: 9500,  dueDate: dateFromNow(10), priority: 'CRITICAL',  paidAmount: 0, isRecurring: true,  recurringDay: 22 },
   { id: 'b7',  name: 'Payroll (1st Half)',      business: 'TRZ', amount: 42000, dueDate: dateFromNow(-2), priority: 'CRITICAL',  paidAmount: 0, isRecurring: true,  recurringDay: 15 },
@@ -405,16 +405,30 @@ export const useAppStore = create(
         const targetWallet = recv.business === 'HSH' ? 'HSH_COH'
           : recv.business === 'TRZ' ? 'TRZ_COH'
           : 'PERS_CASH';
+        // Create an income transaction so the Logbook records the receipt
+        const incomeTx = {
+          id:        crypto.randomUUID(),
+          type:      'INCOME',
+          business:  recv.business,
+          wallet:    targetWallet,
+          category:  null,
+          amount:    recv.amount,
+          note:      `Received: ${recv.source}`,
+          room:      '',
+          createdAt: new Date().toISOString(),
+        };
         set(state => {
           const balances = { ...state.walletBalances };
           balances[targetWallet] = (balances[targetWallet] || 0) + recv.amount;
           return {
             receivables:    state.receivables.map(r => r.id === id ? { ...r, status: 'RECEIVED', receivedAt: new Date().toISOString() } : r),
+            transactions:   [incomeTx, ...state.transactions],
             walletBalances: balances,
           };
         });
-        const updated = get().receivables.find(r => r.id === id);
-        if (updated) db.upsertReceivable(updated).catch(console.error);
+        const updatedRecv = get().receivables.find(r => r.id === id);
+        if (updatedRecv) db.upsertReceivable(updatedRecv).catch(console.error);
+        db.upsertTransaction(incomeTx).catch(console.error);
         db.upsertBalances(get().walletBalances).catch(console.error);
       },
 
